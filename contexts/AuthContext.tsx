@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { userStore } from '../data/realtimeDb';
+import { userStore } from '../data';
 
 interface AuthContextType {
   user: User | null;
