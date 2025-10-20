@@ -4,7 +4,6 @@ import { X, Plus, Minus, Printer, IndianRupee, Move, ShieldCheck, User } from 'l
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { MOCK_MENU } from '../../data/mockData';
 
 interface OrderModalProps {
     isOpen: boolean;
@@ -15,7 +14,7 @@ interface OrderModalProps {
 
 type ModalView = 'main' | 'create_kot' | 'move_table' | 'payment';
 
-const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
+const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu }) => {
     const { user } = useAuth();
     const { tables, addKotToTable, moveTable, settleBill, updateTable } = useData();
     const { addToast } = useToast();
@@ -53,33 +52,33 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
         );
     };
 
-    const handleSendKOT = () => {
+    const handleSendKOT = async () => {
         if (kotItems.length > 0 && user) {
             const itemsToSend = kotItems.map(item => {
                 const { notes, ...rest } = item;
-                // Only include notes if it's not an empty string
                 return notes ? item : rest;
             });
-            addKotToTable(table.id, itemsToSend);
+            await addKotToTable(table.id, itemsToSend);
             onClose(); 
         } else if (!user) {
             addToast('Cannot send KOT. User not found.', 'error');
         }
     };
     
-    const handleMoveTable = () => {
-        if (moveTable(table.id, moveToTableId)) {
+    const handleMoveTable = async () => {
+        const success = await moveTable(table.id, moveToTableId);
+        if (success) {
             onClose();
         }
     };
 
-    const handleSettleBill = (paymentMode: string) => {
-        settleBill(table.id, paymentMode);
+    const handleSettleBill = async (paymentMode: string) => {
+        await settleBill(table.id, paymentMode);
         onClose();
     };
 
-    const handleGenerateBill = () => {
-        updateTable({ ...table, status: TableStatus.BILLING });
+    const handleGenerateBill = async () => {
+        await updateTable({ ...table, status: TableStatus.BILLING });
         addToast(`Bill generated for table ${table.name}.`, 'info');
         onClose();
     };
@@ -95,7 +94,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
     };
 
     const renderMenu = () => {
-        const categories = [...new Set(MOCK_MENU.map(item => item.category))];
+        const categories = [...new Set(menu.map(item => item.category))];
         return (
             <div>
                 <h3 className="text-lg font-bold mb-4">Create KOT for {table.name}</h3>
@@ -104,7 +103,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
                         {categories.map(category => (
                             <div key={category}>
                                 <h4 className="font-semibold text-primary my-2">{category}</h4>
-                                {MOCK_MENU.filter(item => item.category === category).map(item => (
+                                {menu.filter(item => item.category === category).map(item => (
                                     <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
                                         <span>{item.name}</span>
                                         <div className="flex items-center space-x-2">

@@ -1,18 +1,20 @@
 import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
-import { Table, KOTItem, OnlineOrder, OnlineOrderStatus, Sale, User } from '../types';
-import { tableStore, onlineOrderStore, salesStore, db } from '../data/realtimeDb';
+import { Table, KOTItem, OnlineOrder, OnlineOrderStatus, Sale, User, MenuItem } from '../types';
 import { useToast } from './ToastContext';
 import { useAuth } from './AuthContext';
+import { api } from '../api';
+import { toClientOnlineOrder, toClientSale, toClientTable, toServerTable } from '../utils/serializers';
 
 interface DataContextType {
     tables: Table[];
     onlineOrders: OnlineOrder[];
     sales: Sale[];
-    updateTable: (updatedTable: Table) => void;
-    moveTable: (fromTableId: string, toTableId: string) => boolean;
-    addKotToTable: (tableId: string, kotItems: KOTItem[]) => void;
-    updateOnlineOrderStatus: (orderId: string, status: OnlineOrderStatus) => void;
-    settleBill: (tableId: string, paymentMode: string) => void;
+    menu: MenuItem[];
+    updateTable: (updatedTable: Table) => Promise<void>;
+    moveTable: (fromTableId: string, toTableId: string) => Promise<boolean>;
+    addKotToTable: (tableId: string, kotItems: KOTItem[]) => Promise<void>;
+    updateOnlineOrderStatus: (orderId: string, status: OnlineOrderStatus) => Promise<void>;
+    settleBill: (tableId: string, paymentMode: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -21,57 +23,80 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [tables, setTables] = useState<Table[]>([]);
     const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>([]);
     const [sales, setSales] = useState<Sale[]>([]);
+    const [menu, setMenu] = useState<MenuItem[]>([]);
     const { addToast } = useToast();
     const { user } = useAuth();
 
     useEffect(() => {
-        const unsubscribeTables = tableStore.subscribe(setTables);
-        const unsubscribeOrders = onlineOrderStore.subscribe(setOnlineOrders);
-        const unsubscribeSales = salesStore.subscribe(setSales);
-        return () => {
-            unsubscribeTables();
-            unsubscribeOrders();
-            unsubscribeSales();
+        const load = async () => {
+            try {
+                const [tbls, orders, sls, mnu] = await Promise.all([
+                    api.getTables(),
+                    api.getOnlineOrders(),
+                    api.getSales(),
+                    api.getMenu(),
+                ]);
+                setTables((tbls as any[]).map(toClientTable));
+                setOnlineOrders((orders as any[]).map(toClientOnlineOrder));
+                setSales((sls as any[]).map(toClientSale));
+                setMenu(mnu as MenuItem[]);
+            } catch (e) {
+                console.error(e);
+                addToast('Failed to load data from server.', 'error');
+            }
         };
+        void load();
     }, []);
 
-    const addKotToTable = (tableId: string, kotItems: KOTItem[]) => {
+    const addKotToTable = async (tableId: string, kotItems: KOTItem[]) => {
         if (!user) {
             addToast('You must be logged in to perform this action.', 'error');
             return;
         }
-        db.addKotToTable(tableId, kotItems, user);
+        await api.addKot(tableId, kotItems as any[], user as any);
+        const tbls = await api.getTables();
+        setTables((tbls as any[]).map(toClientTable));
         addToast('KOT sent to kitchen!', 'success');
     };
 
-    const updateTable = (updatedTable: Table) => {
-        db.updateTable(updatedTable);
+    const updateTable = async (updatedTable: Table) => {
+        await api.updateTable(updatedTable.id, toServerTable(updatedTable));
+        const tbls = await api.getTables();
+        setTables((tbls as any[]).map(toClientTable));
     };
 
-    const moveTable = (fromTableId: string, toTableId: string): boolean => {
+    const moveTable = async (fromTableId: string, toTableId: string): Promise<boolean> => {
         const fromTableName = tables.find(t => t.id === fromTableId)?.name || '';
         const toTableName = tables.find(t => t.id === toTableId)?.name || '';
-        const success = db.moveTable(fromTableId, toTableId);
-        if (success) {
+        try {
+            await api.moveTable(fromTableId, toTableId);
+            const tbls = await api.getTables();
+            setTables((tbls as any[]).map(toClientTable));
             addToast(`Table ${fromTableName} moved to ${toTableName}.`, 'success');
-        } else {
+            return true;
+        } catch (e) {
             addToast('Move failed. Destination table is occupied.', 'error');
+            return false;
         }
-        return success;
     };
     
-    const settleBill = (tableId: string, paymentMode: string) => {
+    const settleBill = async (tableId: string, paymentMode: string) => {
         const tableName = tables.find(t => t.id === tableId)?.name || '';
-        db.settleBill(tableId, paymentMode);
+        await api.settleBill(tableId, paymentMode);
+        const [tbls, sls] = await Promise.all([api.getTables(), api.getSales()]);
+        setTables((tbls as any[]).map(toClientTable));
+        setSales((sls as any[]).map(toClientSale));
         addToast(`Bill for table ${tableName} settled with ${paymentMode}.`, 'success');
     };
     
-    const updateOnlineOrderStatus = (orderId: string, status: OnlineOrderStatus) => {
-        db.updateOnlineOrderStatus(orderId, status);
+    const updateOnlineOrderStatus = async (orderId: string, status: OnlineOrderStatus) => {
+        await api.updateOnlineOrder(orderId, status as any);
+        const orders = await api.getOnlineOrders();
+        setOnlineOrders((orders as any[]).map(toClientOnlineOrder));
         addToast(`Order #${orderId} status updated to ${status}.`, 'info');
     };
 
-    const value = { tables, onlineOrders, sales, updateTable, moveTable, addKotToTable, updateOnlineOrderStatus, settleBill };
+    const value = { tables, onlineOrders, sales, menu, updateTable, moveTable, addKotToTable, updateOnlineOrderStatus, settleBill };
 
     return (
         <DataContext.Provider value={value}>
