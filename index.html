@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RestoManager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+            },
+            colors: {
+              primary: '#E23744',
+              'primary-dark': '#C01C2B',
+              'status-available': '#22c55e', // green-500
+              'status-running': '#f97316',   // orange-500
+              'status-billing': '#3b82f6',   // blue-500
+              'status-closed': '#6b7280',    // gray-500
+            },
+            keyframes: {
+              'fade-in-down': {
+                '0%': {
+                  opacity: '0',
+                  transform: 'translateY(-10px)'
+                },
+                '100%': {
+                  opacity: '1',
+                  transform: 'translateY(0)'
+                },
+              }
+            },
+            animation: {
+              'fade-in-down': 'fade-in-down 0.5s ease-out'
+            }
+          }
+        }
+      }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.4",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.546.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0"
+  }
+}
+</script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>

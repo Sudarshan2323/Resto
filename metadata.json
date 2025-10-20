@@ -1,0 +1,5 @@
+{
+  "name": "RestoManager - Restaurant Order Management",
+  "description": "A full-featured Restaurant Order Management Application inspired by Zomato’s modern UI. It supports Admin and Sub-Admin (Captain) roles with separate dashboards for managing tables, orders, KOTs, payments, and viewing sales analytics.",
+  "requestFramePermissions": []
+}
