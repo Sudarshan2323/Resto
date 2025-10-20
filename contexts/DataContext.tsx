@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
 import { Table, KOTItem, OnlineOrder, OnlineOrderStatus, Sale, User } from '../types';
-import { tableStore, onlineOrderStore, salesStore, db } from '../data/realtimeDb';
+import { tableStore, onlineOrderStore, salesStore, db } from '../data';
 import { useToast } from './ToastContext';
 import { useAuth } from './AuthContext';
 
