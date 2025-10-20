@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { userStore } from '../data/realtimeDb';
+import { api } from '../api';
 
 interface AuthContextType {
   user: User | null;
@@ -30,16 +30,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (email: string, pass: string): Promise<boolean> => {
-    const users = userStore.getState();
-    const foundUser = users.find(u => u.email === email && u.password === pass);
-    
-    if (foundUser) {
-      const { password, ...userData } = foundUser;
-      setUser(userData as User);
-      localStorage.setItem('restoUser', JSON.stringify(userData));
+    try {
+      const loggedIn = await api.login(email, pass);
+      setUser(loggedIn as User);
+      localStorage.setItem('restoUser', JSON.stringify(loggedIn));
       return true;
+    } catch (e) {
+      return false;
     }
-    return false;
   };
 
   const logout = () => {
