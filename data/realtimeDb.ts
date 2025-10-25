@@ -17,7 +17,6 @@ class RealtimeStore<T> {
     private storageKey: string;
 
     constructor(storageKey: string, initialData: T[]) {
-        this.storageKey = storageKey;
         try {
             const storedData = localStorage.getItem(this.storageKey);
             this.data = storedData ? JSON.parse(storedData, dateReviver) : initialData;
@@ -143,6 +142,37 @@ export const db = {
             }
             return t;
         }));
+    },
+    cancelKotItem: (tableId: string, kotId: string, itemId: string) => {
+        tableStore.setState(prevTables =>
+            prevTables.map(table => {
+                if (table.id === tableId) {
+                    let itemPriceToDeduct = 0;
+                    const updatedKots = table.kots.map(kot => {
+                        if (kot.id === kotId) {
+                            const updatedItems = kot.items.map(item => {
+                                if (item.id === itemId && !item.cancelled) {
+                                    itemPriceToDeduct = item.price * item.quantity;
+                                    return { ...item, cancelled: true };
+                                }
+                                return item;
+                            });
+                            return { ...kot, items: updatedItems };
+                        }
+                        return kot;
+                    });
+    
+                    const newBill = table.currentBill - itemPriceToDeduct;
+    
+                    return {
+                        ...table,
+                        kots: updatedKots,
+                        currentBill: newBill < 0 ? 0 : newBill,
+                    };
+                }
+                return table;
+            })
+        );
     },
     updateOnlineOrderStatus: (orderId: string, status: OnlineOrderStatus) => {
         onlineOrderStore.setState(prevOrders =>

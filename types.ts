@@ -1,4 +1,5 @@
 
+
 // FIX: Removed self-import of UserRole which was causing a conflict with the local declaration.
 export enum UserRole {
   ADMIN = 'admin',
@@ -38,6 +39,7 @@ export interface MenuItem {
 export interface KOTItem extends MenuItem {
   quantity: number;
   notes?: string;
+  cancelled?: boolean;
 }
 
 export interface KOT {

@@ -13,11 +13,11 @@ interface OrderModalProps {
     menu: MenuItem[];
 }
 
-type ModalView = 'main' | 'create_kot' | 'move_table' | 'payment' | 'cancel_order';
+type ModalView = 'main' | 'create_kot' | 'move_table' | 'payment';
 
 const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu }) => {
     const { user } = useAuth();
-    const { tables, addKotToTable, moveTable, settleBill, updateTable } = useData();
+    const { tables, addKotToTable, moveTable, settleBill, updateTable, cancelKotItem } = useData();
     const { addToast } = useToast();
     const [view, setView] = useState<ModalView>(table.status === 'Available' ? 'create_kot' : 'main');
     const [kotItems, setKotItems] = useState<KOTItem[]>([]);
@@ -26,6 +26,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
     const [pinError, setPinError] = useState('');
     const [confirmingPaymentMode, setConfirmingPaymentMode] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [cancellingItem, setCancellingItem] = useState<{ kotId: string; item: KOTItem } | null>(null);
 
     const filteredMenu = useMemo(() => {
         if (!searchTerm.trim()) {
@@ -45,6 +46,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
             setPinError('');
             setConfirmingPaymentMode(null);
             setSearchTerm('');
+            setCancellingItem(null);
         }
     }, [isOpen, table]);
 
@@ -106,25 +108,20 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
         addToast(`Bill generated for table ${table.name}.`, 'info');
         onClose();
     };
+    
+    const handleConfirmCancelItem = () => {
+        if (!cancellingItem) return;
 
-    const handleCancelOrder = () => {
         if (adminPin !== '5566') {
             setPinError('Invalid Admin PIN.');
             return;
         }
 
-        updateTable({
-            ...table,
-            status: TableStatus.AVAILABLE,
-            kots: [],
-            currentBill: 0,
-            orderStartTime: undefined,
-            captainId: undefined,
-            captainName: undefined,
-        });
-
-        addToast(`Order for table ${table.name} has been cancelled.`, 'success');
-        onClose();
+        cancelKotItem(table.id, cancellingItem.kotId, cancellingItem.item.id);
+        
+        setCancellingItem(null);
+        setAdminPin('');
+        setPinError('');
     };
     
     const handleAdminAccess = () => {
@@ -240,44 +237,34 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
             <div className="my-6 max-h-60 overflow-y-auto border-t border-b dark:border-gray-700 py-4">
                 <h3 className="font-semibold mb-2">KOT Details</h3>
                 {table.kots.length > 0 ? table.kots.map((kot, index) => {
-                    const groupedItems = kot.items.reduce((acc, item) => {
-                        if (!acc[item.category]) {
-                            acc[item.category] = [];
-                        }
-                        acc[item.category].push(item);
-                        return acc;
-                    }, {} as Record<string, KOTItem[]>);
                     return (
                         <div key={kot.id} className="mb-4 text-sm bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
                             <p className="font-semibold text-gray-800 dark:text-white mb-2">KOT #{index + 1} - {new Date(kot.createdAt).toLocaleTimeString()}</p>
-                            {/* FIX: Replaced Object.entries with Object.keys to prevent potential TypeScript inference issues where the value in [key, value] is treated as 'unknown'. */}
-                            {Object.keys(groupedItems).map((category) => {
-                                const items = groupedItems[category];
-                                return (
-                                <div key={category} className="mt-1">
-                                    <p className="font-bold text-xs uppercase text-gray-500 dark:text-gray-400 pb-1">{category}</p>
-                                    <ul className="pl-2 mt-1 space-y-1 text-gray-600 dark:text-gray-400">
-                                        {items.map(item => (
-                                            <li key={item.id} className="flex justify-between">
-                                                <span>{item.name} x {item.quantity}</span>
-                                                {item.notes && <span className="text-xs text-orange-500 italic">({item.notes})</span>}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                                );
-                            })}
+                            <ul className="mt-1 space-y-1">
+                                {kot.items.map(item => (
+                                    <li key={item.id} className={`flex justify-between items-center ${item.cancelled ? 'text-gray-400 line-through dark:text-gray-500' : 'text-gray-600 dark:text-gray-300'}`}>
+                                        <span>
+                                            {item.name} x {item.quantity}
+                                            {item.notes && <span className="text-xs text-orange-500 italic ml-2">({item.notes})</span>}
+                                        </span>
+                                        {!item.cancelled && table.status !== TableStatus.AVAILABLE && (
+                                            <button 
+                                                onClick={() => setCancellingItem({ kotId: kot.id, item: item })}
+                                                className="p-1 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50"
+                                                aria-label={`Cancel item ${item.name}`}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
                     );
                 }) : <p className="text-sm text-gray-500">No KOTs generated for this table yet.</p>}
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-                {table.status !== TableStatus.AVAILABLE &&
-                    <button onClick={() => setView('main')} className="flex items-center justify-center space-x-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        <UserIcon size={18}/><span>View KOTs</span>
-                    </button>
-                }
                 <button onClick={() => setView('create_kot')} className="col-span-2 flex items-center justify-center space-x-2 p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 font-bold">
                     <Plus size={18}/><span>Create KOT</span>
                 </button>
@@ -294,11 +281,6 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
                 {table.status === TableStatus.BILLING &&
                     <button onClick={() => setView('payment')} className="col-span-2 flex items-center justify-center space-x-2 p-3 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 font-bold">
                         <IndianRupee size={18}/><span>Take Payment</span>
-                    </button>
-                }
-                 {table.status === TableStatus.RUNNING && user?.role === UserRole.CAPTAIN &&
-                    <button onClick={() => setView('cancel_order')} className="col-span-2 flex items-center justify-center space-x-2 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 font-bold">
-                        <XCircle size={18}/><span>Cancel Order</span>
                     </button>
                 }
                 {user?.role === UserRole.CAPTAIN && table.status === TableStatus.BILLING &&
@@ -332,29 +314,37 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
             </div>
         </div>
     );
-
-    const renderCancelOrderView = () => (
-        <div>
-            <h3 className="text-lg font-bold mb-2">Cancel Order for {table.name}</h3>
-            <p className="text-sm text-gray-500 mb-4">Admin authorization is required to cancel this running order. This action will reset the table and cannot be undone.</p>
-            <div className="flex">
-                <input
-                    type="password"
-                    value={adminPin}
-                    onChange={e => {
-                        setAdminPin(e.target.value);
-                        if (pinError) setPinError('');
-                    }}
-                    placeholder="Enter Admin PIN"
-                    className="w-full px-3 py-2 text-sm border rounded-l-md dark:bg-gray-700 dark:border-gray-600 focus:ring-primary focus:border-primary"
-                />
-                <button onClick={handleCancelOrder} className="flex items-center justify-center space-x-2 px-4 bg-red-500 text-white rounded-r-md hover:bg-red-600 text-sm font-semibold">
-                    <Trash2 size={16}/>
-                    <span>Confirm Cancel</span>
+    
+    const renderCancelItemView = () => (
+        <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex justify-center items-center">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-2xl w-full max-w-sm border dark:border-gray-700">
+                <h3 className="text-lg font-bold mb-2">Cancel Item</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                    Cancel <span className="font-semibold text-gray-800 dark:text-white">{cancellingItem?.item.name}</span> (Qty: {cancellingItem?.item.quantity})? 
+                    Admin PIN required.
+                </p>
+                <div className="flex">
+                    <input
+                        type="password"
+                        value={adminPin}
+                        onChange={e => {
+                            setAdminPin(e.target.value);
+                            if (pinError) setPinError('');
+                        }}
+                        placeholder="Enter Admin PIN"
+                        className="w-full px-3 py-2 text-sm border rounded-l-md dark:bg-gray-700 dark:border-gray-600 focus:ring-primary focus:border-primary"
+                        autoFocus
+                    />
+                    <button onClick={handleConfirmCancelItem} className="flex items-center justify-center space-x-2 px-4 bg-red-500 text-white rounded-r-md hover:bg-red-600 text-sm font-semibold">
+                        <Trash2 size={16}/>
+                        <span>Confirm</span>
+                    </button>
+                </div>
+                {pinError && <p className="text-xs text-red-500 mt-2 text-center">{pinError}</p>}
+                <button onClick={() => { setCancellingItem(null); setAdminPin(''); setPinError(''); }} className="mt-6 text-sm text-primary w-full text-center">
+                    Back
                 </button>
             </div>
-            {pinError && <p className="text-xs text-red-500 mt-2 text-center">{pinError}</p>}
-            <button onClick={() => setView('main')} className="mt-6 text-sm text-primary">Back to Main</button>
         </div>
     );
 
@@ -391,14 +381,14 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu })
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full p-6 relative transform transition-all ${view === 'create_kot' ? 'max-w-4xl' : 'max-w-lg'}`}>
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 z-20">
                     <X size={24} />
                 </button>
                 {view === 'main' && renderMainView()}
                 {view === 'create_kot' && renderMenu()}
                 {view === 'move_table' && renderMoveTableView()}
                 {view === 'payment' && renderPaymentView()}
-                {view === 'cancel_order' && renderCancelOrderView()}
+                {cancellingItem && renderCancelItemView()}
             </div>
         </div>
     );

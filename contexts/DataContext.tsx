@@ -20,6 +20,7 @@ interface DataContextType {
     addMenuItem: (itemData: Omit<MenuItem, 'id'>) => void;
     updateMenuItem: (updatedItem: MenuItem) => void;
     deleteMenuItem: (itemId: string) => void;
+    cancelKotItem: (tableId: string, kotId: string, itemId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -113,7 +114,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addToast('Menu item deleted.', 'success');
     };
 
-    const value = { tables, onlineOrders, sales, users, menu, updateTable, moveTable, addKotToTable, updateOnlineOrderStatus, settleBill, addCaptain, deleteCaptain, addMenuItem, updateMenuItem, deleteMenuItem };
+    const cancelKotItem = (tableId: string, kotId: string, itemId: string) => {
+        const table = tables.find(t => t.id === tableId);
+        const item = table?.kots.find(k => k.id === kotId)?.items.find(i => i.id === itemId);
+        db.cancelKotItem(tableId, kotId, itemId);
+        addToast(`Item "${item?.name}" cancelled for table ${table?.name}.`, 'success');
+    };
+
+    const value = { tables, onlineOrders, sales, users, menu, updateTable, moveTable, addKotToTable, updateOnlineOrderStatus, settleBill, addCaptain, deleteCaptain, addMenuItem, updateMenuItem, deleteMenuItem, cancelKotItem };
 
     return (
         <DataContext.Provider value={value}>
