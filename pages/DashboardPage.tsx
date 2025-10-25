@@ -7,6 +7,8 @@ import Sidebar from '../components/ui/Sidebar';
 import TableView from '../components/dashboard/TableView';
 import SalesAnalytics from '../components/dashboard/SalesAnalytics';
 import OnlineOrders from '../components/dashboard/OnlineOrders';
+import ManageCaptains from '../components/dashboard/ManageCaptains';
+import ManageMenu from '../components/dashboard/ManageMenu';
 import { UserRole } from '../types';
 
 const DashboardPage: React.FC = () => {
@@ -26,6 +28,8 @@ const DashboardPage: React.FC = () => {
               <>
                 <Route path="sales" element={<SalesAnalytics />} />
                 <Route path="online-orders" element={<OnlineOrders />} />
+                <Route path="captains" element={<ManageCaptains />} />
+                <Route path="menu" element={<ManageMenu />} />
               </>
             )}
             <Route path="*" element={<Navigate to="tables" replace />} />

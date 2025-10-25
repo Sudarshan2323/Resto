@@ -36,7 +36,7 @@ const allTables: Table[] = [
 
 export const INITIAL_TABLES: Table[] = allTables;
 
-export const MOCK_MENU: MenuItem[] = [
+export const INITIAL_MENU: MenuItem[] = [
   { id: 'm1', name: 'Paneer Tikka', price: 250, category: 'Starters' },
   { id: 'm1a', name: 'Chicken 65', price: 320, category: 'Starters' },
   { id: 'm2', name: 'Dal Makhani', price: 300, category: 'Main Course' },

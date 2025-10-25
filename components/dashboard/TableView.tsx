@@ -3,10 +3,9 @@ import { useData } from '../../contexts/DataContext';
 import { Table, TableCategory } from '../../types';
 import TableCard from './TableCard';
 import OrderModal from './OrderModal';
-import { MOCK_MENU } from '../../data/mockData';
 
 const TableView: React.FC = () => {
-    const { tables } = useData();
+    const { tables, menu } = useData();
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
     const handleTableClick = (table: Table) => {
@@ -56,7 +55,7 @@ const TableView: React.FC = () => {
                     isOpen={!!selectedTable}
                     onClose={handleCloseModal}
                     table={selectedTable}
-                    menu={MOCK_MENU}
+                    menu={menu}
                 />
             )}
         </div>

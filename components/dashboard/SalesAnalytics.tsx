@@ -93,7 +93,13 @@ const SalesAnalytics: React.FC = () => {
                 model: 'gemini-2.5-flash',
                 contents: prompt,
             });
-            setDishOfTheDay(response.text);
+            // FIX: Per @google/genai guidelines, the .text property should be used to access the generated text content directly from the response.
+            const text = response.text;
+            if (text) {
+                setDishOfTheDay(text);
+            } else {
+                setDishOfTheDay('Could not fetch suggestion. Please check your API key and connection.');
+            }
 
         } catch(e) {
             console.error(e);

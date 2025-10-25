@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
-import { Table, KOTItem, OnlineOrder, OnlineOrderStatus, Sale, User } from '../types';
-import { tableStore, onlineOrderStore, salesStore, db } from '../data/realtimeDb';
+import { Table, KOTItem, OnlineOrder, OnlineOrderStatus, Sale, User, MenuItem } from '../types';
+import { tableStore, onlineOrderStore, salesStore, userStore, menuStore, db } from '../data/realtimeDb';
 import { useToast } from './ToastContext';
 import { useAuth } from './AuthContext';
 
@@ -8,11 +8,18 @@ interface DataContextType {
     tables: Table[];
     onlineOrders: OnlineOrder[];
     sales: Sale[];
+    users: User[];
+    menu: MenuItem[];
     updateTable: (updatedTable: Table) => void;
     moveTable: (fromTableId: string, toTableId: string) => boolean;
     addKotToTable: (tableId: string, kotItems: KOTItem[]) => void;
     updateOnlineOrderStatus: (orderId: string, status: OnlineOrderStatus) => void;
     settleBill: (tableId: string, paymentMode: string) => void;
+    addCaptain: (captainData: Omit<User, 'id' | 'role'>) => void;
+    deleteCaptain: (userId: string) => void;
+    addMenuItem: (itemData: Omit<MenuItem, 'id'>) => void;
+    updateMenuItem: (updatedItem: MenuItem) => void;
+    deleteMenuItem: (itemId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -21,6 +28,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [tables, setTables] = useState<Table[]>([]);
     const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>([]);
     const [sales, setSales] = useState<Sale[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [menu, setMenu] = useState<MenuItem[]>([]);
     const { addToast } = useToast();
     const { user } = useAuth();
 
@@ -28,10 +37,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const unsubscribeTables = tableStore.subscribe(setTables);
         const unsubscribeOrders = onlineOrderStore.subscribe(setOnlineOrders);
         const unsubscribeSales = salesStore.subscribe(setSales);
+        const unsubscribeUsers = userStore.subscribe(setUsers);
+        const unsubscribeMenu = menuStore.subscribe(setMenu);
         return () => {
             unsubscribeTables();
             unsubscribeOrders();
             unsubscribeSales();
+            unsubscribeUsers();
+            unsubscribeMenu();
         };
     }, []);
 
@@ -70,8 +83,37 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         db.updateOnlineOrderStatus(orderId, status);
         addToast(`Order #${orderId} status updated to ${status}.`, 'info');
     };
+    
+    const addCaptain = (captainData: Omit<User, 'id' | 'role'>) => {
+        const result = db.addCaptain(captainData);
+        if (result.success) {
+            addToast(result.message, 'success');
+        } else {
+            addToast(result.message, 'error');
+        }
+    };
 
-    const value = { tables, onlineOrders, sales, updateTable, moveTable, addKotToTable, updateOnlineOrderStatus, settleBill };
+    const deleteCaptain = (userId: string) => {
+        db.deleteCaptain(userId);
+        addToast('Captain removed successfully.', 'success');
+    };
+
+    const addMenuItem = (itemData: Omit<MenuItem, 'id'>) => {
+        db.addMenuItem(itemData);
+        addToast('Menu item added successfully!', 'success');
+    };
+
+    const updateMenuItem = (updatedItem: MenuItem) => {
+        db.updateMenuItem(updatedItem);
+        addToast('Menu item updated successfully!', 'success');
+    };
+
+    const deleteMenuItem = (itemId: string) => {
+        db.deleteMenuItem(itemId);
+        addToast('Menu item deleted.', 'success');
+    };
+
+    const value = { tables, onlineOrders, sales, users, menu, updateTable, moveTable, addKotToTable, updateOnlineOrderStatus, settleBill, addCaptain, deleteCaptain, addMenuItem, updateMenuItem, deleteMenuItem };
 
     return (
         <DataContext.Provider value={value}>

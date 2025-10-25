@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, BarChart2, UtensilsCrossed, LogOut, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, BarChart2, UtensilsCrossed, LogOut, ChevronLeft, Users, BookMarked } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types';
 
@@ -43,6 +43,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
                 <NavLink to="/sales" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
                   <BarChart2 className="h-5 w-5" />
                   <span className="ml-4">Sales Analytics</span>
+                </NavLink>
+                <NavLink to="/captains" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                  <Users className="h-5 w-5" />
+                  <span className="ml-4">Manage Captains</span>
+                </NavLink>
+                <NavLink to="/menu" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : ''}`}>
+                  <BookMarked className="h-5 w-5" />
+                  <span className="ml-4">Manage Menu</span>
                 </NavLink>
               </>
             )}

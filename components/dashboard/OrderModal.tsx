@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Table, MenuItem, KOTItem, TableStatus, UserRole } from '../../types';
-import { X, Plus, Minus, Printer, IndianRupee, Move, ShieldCheck, User } from 'lucide-react';
+// FIX: Aliased `User` icon from `lucide-react` to `UserIcon` to avoid a name collision with the `User` type.
+import { X, Plus, Minus, Printer, IndianRupee, Move, ShieldCheck, User as UserIcon, XCircle, Trash2 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { MOCK_MENU } from '../../data/mockData';
 
 interface OrderModalProps {
     isOpen: boolean;
@@ -13,9 +13,9 @@ interface OrderModalProps {
     menu: MenuItem[];
 }
 
-type ModalView = 'main' | 'create_kot' | 'move_table' | 'payment';
+type ModalView = 'main' | 'create_kot' | 'move_table' | 'payment' | 'cancel_order';
 
-const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
+const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table, menu }) => {
     const { user } = useAuth();
     const { tables, addKotToTable, moveTable, settleBill, updateTable } = useData();
     const { addToast } = useToast();
@@ -24,6 +24,29 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
     const [moveToTableId, setMoveToTableId] = useState<string>('');
     const [adminPin, setAdminPin] = useState('');
     const [pinError, setPinError] = useState('');
+    const [confirmingPaymentMode, setConfirmingPaymentMode] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredMenu = useMemo(() => {
+        if (!searchTerm.trim()) {
+            return menu;
+        }
+        return menu.filter(item =>
+            item.name.toLowerCase().includes(searchTerm.trim().toLowerCase())
+        );
+    }, [menu, searchTerm]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setView(table.status === 'Available' ? 'create_kot' : 'main');
+            setKotItems([]);
+            setMoveToTableId('');
+            setAdminPin('');
+            setPinError('');
+            setConfirmingPaymentMode(null);
+            setSearchTerm('');
+        }
+    }, [isOpen, table]);
 
     if (!isOpen) return null;
 
@@ -83,6 +106,26 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
         addToast(`Bill generated for table ${table.name}.`, 'info');
         onClose();
     };
+
+    const handleCancelOrder = () => {
+        if (adminPin !== '5566') {
+            setPinError('Invalid Admin PIN.');
+            return;
+        }
+
+        updateTable({
+            ...table,
+            status: TableStatus.AVAILABLE,
+            kots: [],
+            currentBill: 0,
+            orderStartTime: undefined,
+            captainId: undefined,
+            captainName: undefined,
+        });
+
+        addToast(`Order for table ${table.name} has been cancelled.`, 'success');
+        onClose();
+    };
     
     const handleAdminAccess = () => {
         if (adminPin === '5566') {
@@ -93,65 +136,94 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
             setPinError('Invalid PIN');
         }
     };
-
+    
     const renderMenu = () => {
-        const categories = [...new Set(MOCK_MENU.map(item => item.category))];
         return (
             <div>
-                <h3 className="text-lg font-bold mb-4">Create KOT for {table.name}</h3>
-                <div className="flex space-x-4">
-                    <div className="w-1/2 h-96 overflow-y-auto pr-2">
-                        {categories.map(category => (
-                            <div key={category}>
-                                <h4 className="font-semibold text-primary my-2">{category}</h4>
-                                {MOCK_MENU.filter(item => item.category === category).map(item => (
-                                    <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                        <span>{item.name}</span>
-                                        <div className="flex items-center space-x-2">
-                                            <span>₹{item.price}</span>
-                                            <button onClick={() => handleAddItem(item)} className="bg-primary text-white rounded-full p-1 h-6 w-6 flex items-center justify-center"><Plus size={16}/></button>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold">Create KOT for Table {table.name}</h3>
+                    {table.status !== 'Available' && (
+                        <button onClick={() => setView('main')} className="text-sm text-primary font-semibold hover:underline">
+                            Back to Details
+                        </button>
+                    )}
+                </div>
+                <div className="flex space-x-4 h-[50vh]">
+                    {/* Menu Items Panel */}
+                    <div className="w-1/2 flex flex-col">
+                        <div className="flex-shrink-0 mb-3">
+                            <input
+                                type="text"
+                                placeholder="Search for an item..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+                            />
+                        </div>
+                        <div className="flex-grow overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden]">
+                             <div className="space-y-2">
+                                 {filteredMenu.length > 0 ? filteredMenu.map(item => (
+                                    <div key={item.id} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                                        <div>
+                                            <p className="font-semibold text-gray-800 dark:text-white">{item.name}</p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">₹{item.price}</p>
                                         </div>
+                                        <button onClick={() => handleAddItem(item)} className="bg-primary/20 text-primary rounded-full p-2 h-8 w-8 flex items-center justify-center hover:bg-primary/30 transition-colors">
+                                            <Plus size={16}/>
+                                        </button>
                                     </div>
-                                ))}
-                            </div>
-                        ))}
+                                 )) : <p className="text-center text-gray-500 pt-10">No items match your search.</p>}
+                             </div>
+                        </div>
                     </div>
-                    <div className="w-1/2 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <h4 className="font-semibold mb-2">Current KOT</h4>
-                        {kotItems.length === 0 ? <p className="text-sm text-gray-500">No items added yet.</p> : (
-                            <div className="space-y-2 h-72 overflow-y-auto">
+
+                    {/* KOT Summary Panel */}
+                    <div className="w-1/2 bg-gray-100 dark:bg-gray-900 p-4 rounded-lg flex flex-col">
+                        <h4 className="font-semibold text-lg mb-3 flex-shrink-0">Current KOT</h4>
+                        {kotItems.length === 0 ? (
+                            <div className="flex-grow flex items-center justify-center">
+                                <p className="text-sm text-gray-500">Select items to add them here.</p>
+                            </div>
+                         ) : (
+                            <div className="space-y-2 overflow-y-auto flex-grow pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden]">
                                 {kotItems.map(item => (
-                                    <div key={item.id} className="text-sm border-b dark:border-gray-700 pb-2">
+                                    <div key={item.id} className="text-sm py-2">
                                         <div className="flex justify-between items-center">
-                                            <span>{item.name}</span>
-                                            <div className="flex items-center space-x-2">
-                                                <button onClick={() => handleRemoveItem(item.id)} className="bg-gray-200 dark:bg-gray-600 rounded-full p-1 h-5 w-5 flex items-center justify-center"><Minus size={12}/></button>
-                                                <span>{item.quantity}</span>
-                                                <button onClick={() => handleAddItem(item)} className="bg-gray-200 dark:bg-gray-600 rounded-full p-1 h-5 w-5 flex items-center justify-center"><Plus size={12}/></button>
-                                                <span>₹{item.price * item.quantity}</span>
-                                            </div>
+                                            <span className="font-medium text-gray-800 dark:text-white">{item.name}</span>
+                                            <span className="font-semibold">₹{item.price * item.quantity}</span>
                                         </div>
-                                        <input
-                                            type="text"
-                                            value={item.notes || ''}
-                                            onChange={(e) => handleNoteChange(item.id, e.target.value)}
-                                            placeholder="Add note (e.g., less spicy)"
-                                            className="w-full text-xs px-2 py-1 mt-2 rounded border bg-white dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-primary"
-                                        />
+                                        <div className="flex items-center justify-between mt-1">
+                                            <div className="flex items-center space-x-2">
+                                                <button onClick={() => handleRemoveItem(item.id)} className="bg-gray-200 dark:bg-gray-700 rounded-full p-1 h-5 w-5 flex items-center justify-center"><Minus size={12}/></button>
+                                                <span>{item.quantity}</span>
+                                                <button onClick={() => handleAddItem(item)} className="bg-gray-200 dark:bg-gray-700 rounded-full p-1 h-5 w-5 flex items-center justify-center"><Plus size={12}/></button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={item.notes || ''}
+                                                onChange={(e) => handleNoteChange(item.id, e.target.value)}
+                                                placeholder="Note..."
+                                                className="w-1/2 text-xs px-2 py-1 rounded border bg-white dark:bg-gray-800 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-primary"
+                                            />
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        <div className="border-t dark:border-gray-600 mt-4 pt-4">
-                            <div className="flex justify-between font-bold">
+                        <div className="border-t dark:border-gray-700 mt-4 pt-4 flex-shrink-0">
+                            <div className="flex justify-between font-bold text-lg mb-4">
                                 <span>Total</span>
-                                <span>₹{kotItems.reduce((sum, item) => sum + item.price * item.quantity, 0)}</span>
+                                <span>₹{kotItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}</span>
                             </div>
-                            <button onClick={handleSendKOT} className="w-full bg-green-500 text-white py-2 mt-4 rounded-lg hover:bg-green-600">Send KOT to Kitchen</button>
+                            <button 
+                                onClick={handleSendKOT} 
+                                disabled={kotItems.length === 0}
+                                className="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 font-bold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+                                    Send KOT to Kitchen
+                            </button>
                         </div>
                     </div>
                 </div>
-                 <button onClick={() => setView('main')} className="mt-4 text-sm text-primary">Back to Main</button>
             </div>
         );
     };
@@ -167,25 +239,43 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
             </div>
             <div className="my-6 max-h-60 overflow-y-auto border-t border-b dark:border-gray-700 py-4">
                 <h3 className="font-semibold mb-2">KOT Details</h3>
-                {table.kots.length > 0 ? table.kots.map((kot, index) => (
-                    <div key={kot.id} className="mb-4 text-sm">
-                        <p className="font-semibold">KOT #{index + 1} - {new Date(kot.createdAt).toLocaleTimeString()}</p>
-                        <ul className="list-disc pl-5 text-gray-600 dark:text-gray-400">
-                            {kot.items.map(item => (
-                                <li key={item.id}>
-                                    {item.name} x {item.quantity}
-                                    {item.notes && <span className="text-xs text-orange-500 italic ml-2">({item.notes})</span>}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )) : <p className="text-sm text-gray-500">No KOTs generated for this table yet.</p>}
+                {table.kots.length > 0 ? table.kots.map((kot, index) => {
+                    const groupedItems = kot.items.reduce((acc, item) => {
+                        if (!acc[item.category]) {
+                            acc[item.category] = [];
+                        }
+                        acc[item.category].push(item);
+                        return acc;
+                    }, {} as Record<string, KOTItem[]>);
+                    return (
+                        <div key={kot.id} className="mb-4 text-sm bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
+                            <p className="font-semibold text-gray-800 dark:text-white mb-2">KOT #{index + 1} - {new Date(kot.createdAt).toLocaleTimeString()}</p>
+                            {/* FIX: Replaced Object.entries with Object.keys to prevent potential TypeScript inference issues where the value in [key, value] is treated as 'unknown'. */}
+                            {Object.keys(groupedItems).map((category) => {
+                                const items = groupedItems[category];
+                                return (
+                                <div key={category} className="mt-1">
+                                    <p className="font-bold text-xs uppercase text-gray-500 dark:text-gray-400 pb-1">{category}</p>
+                                    <ul className="pl-2 mt-1 space-y-1 text-gray-600 dark:text-gray-400">
+                                        {items.map(item => (
+                                            <li key={item.id} className="flex justify-between">
+                                                <span>{item.name} x {item.quantity}</span>
+                                                {item.notes && <span className="text-xs text-orange-500 italic">({item.notes})</span>}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                );
+                            })}
+                        </div>
+                    );
+                }) : <p className="text-sm text-gray-500">No KOTs generated for this table yet.</p>}
             </div>
             
             <div className="grid grid-cols-2 gap-4">
                 {table.status !== TableStatus.AVAILABLE &&
                     <button onClick={() => setView('main')} className="flex items-center justify-center space-x-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        <User size={18}/><span>View KOTs</span>
+                        <UserIcon size={18}/><span>View KOTs</span>
                     </button>
                 }
                 <button onClick={() => setView('create_kot')} className="col-span-2 flex items-center justify-center space-x-2 p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 font-bold">
@@ -196,7 +286,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
                         <Move size={18}/><span>Move Table</span>
                     </button>
                 }
-                {table.status !== TableStatus.AVAILABLE &&
+                {table.status !== TableStatus.AVAILABLE && table.status !== TableStatus.BILLING &&
                     <button onClick={handleGenerateBill} className="flex items-center justify-center space-x-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
                         <Printer size={18}/><span>Generate Bill</span>
                     </button>
@@ -206,7 +296,12 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
                         <IndianRupee size={18}/><span>Take Payment</span>
                     </button>
                 }
-                {user?.role === UserRole.CAPTAIN &&
+                 {table.status === TableStatus.RUNNING && user?.role === UserRole.CAPTAIN &&
+                    <button onClick={() => setView('cancel_order')} className="col-span-2 flex items-center justify-center space-x-2 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 font-bold">
+                        <XCircle size={18}/><span>Cancel Order</span>
+                    </button>
+                }
+                {user?.role === UserRole.CAPTAIN && table.status === TableStatus.BILLING &&
                     <div className="col-span-2 mt-2">
                         <p className="text-xs text-center text-gray-500 mb-2">Need to edit bill?</p>
                         <div className="flex">
@@ -238,22 +333,64 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
         </div>
     );
 
-    const renderPaymentView = () => (
+    const renderCancelOrderView = () => (
         <div>
-            <h3 className="text-lg font-bold mb-4">Settle Bill for {table.name} - ₹{table.currentBill.toFixed(2)}</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => handleSettleBill('Cash')} className="p-4 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 font-semibold">💵 Cash</button>
-                <button onClick={() => handleSettleBill('Card')} className="p-4 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 font-semibold">💳 Card</button>
-                <button onClick={() => handleSettleBill('UPI')} className="p-4 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 font-semibold">📱 UPI</button>
-                 <button onClick={() => handleSettleBill('Other')} className="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold">Other</button>
+            <h3 className="text-lg font-bold mb-2">Cancel Order for {table.name}</h3>
+            <p className="text-sm text-gray-500 mb-4">Admin authorization is required to cancel this running order. This action will reset the table and cannot be undone.</p>
+            <div className="flex">
+                <input
+                    type="password"
+                    value={adminPin}
+                    onChange={e => {
+                        setAdminPin(e.target.value);
+                        if (pinError) setPinError('');
+                    }}
+                    placeholder="Enter Admin PIN"
+                    className="w-full px-3 py-2 text-sm border rounded-l-md dark:bg-gray-700 dark:border-gray-600 focus:ring-primary focus:border-primary"
+                />
+                <button onClick={handleCancelOrder} className="flex items-center justify-center space-x-2 px-4 bg-red-500 text-white rounded-r-md hover:bg-red-600 text-sm font-semibold">
+                    <Trash2 size={16}/>
+                    <span>Confirm Cancel</span>
+                </button>
             </div>
-            <button onClick={() => setView('main')} className="mt-6 text-sm text-primary">Back</button>
+            {pinError && <p className="text-xs text-red-500 mt-2 text-center">{pinError}</p>}
+            <button onClick={() => setView('main')} className="mt-6 text-sm text-primary">Back to Main</button>
         </div>
     );
-    
+
+    const renderPaymentView = () => {
+        if (confirmingPaymentMode) {
+            return (
+                <div>
+                    <h3 className="text-lg font-bold mb-4">Confirm Settlement</h3>
+                    <p className="text-gray-600 dark:text-gray-300">
+                        Are you sure you want to settle the bill for <span className="font-bold">₹{table.currentBill.toFixed(2)}</span> using <span className="font-bold">{confirmingPaymentMode}</span>?
+                    </p>
+                    <div className="flex justify-end space-x-4 mt-6">
+                        <button onClick={() => setConfirmingPaymentMode(null)} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+                        <button onClick={() => handleSettleBill(confirmingPaymentMode)} className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary-dark">Yes, Settle</button>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div>
+                <h3 className="text-lg font-bold mb-4">Settle Bill for {table.name} - ₹{table.currentBill.toFixed(2)}</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => setConfirmingPaymentMode('Cash')} className="p-4 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 font-semibold">💵 Cash</button>
+                    <button onClick={() => setConfirmingPaymentMode('Card')} className="p-4 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 font-semibold">💳 Card</button>
+                    <button onClick={() => setConfirmingPaymentMode('UPI')} className="p-4 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 font-semibold">📱 UPI</button>
+                    <button onClick={() => setConfirmingPaymentMode('Other')} className="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold">Other</button>
+                </div>
+                <button onClick={() => setView('main')} className="mt-6 text-sm text-primary">Back</button>
+            </div>
+        );
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg p-6 relative transform transition-all">
+            <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full p-6 relative transform transition-all ${view === 'create_kot' ? 'max-w-4xl' : 'max-w-lg'}`}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                     <X size={24} />
                 </button>
@@ -261,6 +398,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, table }) => {
                 {view === 'create_kot' && renderMenu()}
                 {view === 'move_table' && renderMoveTableView()}
                 {view === 'payment' && renderPaymentView()}
+                {view === 'cancel_order' && renderCancelOrderView()}
             </div>
         </div>
     );

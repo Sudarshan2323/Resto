@@ -1,5 +1,5 @@
-import { Table, OnlineOrder, KOT, KOTItem, TableStatus, OnlineOrderStatus, User, Sale } from '../types';
-import { INITIAL_TABLES, INITIAL_ONLINE_ORDERS, INITIAL_USERS } from './mockData';
+import { Table, OnlineOrder, KOT, KOTItem, TableStatus, OnlineOrderStatus, User, Sale, UserRole, MenuItem } from '../types';
+import { INITIAL_TABLES, INITIAL_ONLINE_ORDERS, INITIAL_USERS, INITIAL_MENU } from './mockData';
 
 // Custom JSON reviver to handle Date objects during parsing
 const dateReviver = (key: string, value: any) => {
@@ -75,6 +75,7 @@ export const userStore = new RealtimeStore<User>('resto-users', INITIAL_USERS);
 export const tableStore = new RealtimeStore<Table>('resto-tables', INITIAL_TABLES);
 export const onlineOrderStore = new RealtimeStore<OnlineOrder>('resto-online-orders', INITIAL_ONLINE_ORDERS);
 export const salesStore = new RealtimeStore<Sale>('resto-sales', []);
+export const menuStore = new RealtimeStore<MenuItem>('resto-menu', INITIAL_MENU);
 
 export const db = {
     addKotToTable: (tableId: string, kotItems: KOTItem[], captain: User) => {
@@ -147,5 +148,43 @@ export const db = {
         onlineOrderStore.setState(prevOrders =>
             prevOrders.map(order => (order.id === orderId ? { ...order, status } : order))
         );
-    }
+    },
+    addCaptain: (captainData: Omit<User, 'id' | 'role'>): { success: boolean, message: string } => {
+        const existingUser = userStore.getState().find(u => u.email === captainData.email);
+        if (existingUser) {
+            return { success: false, message: 'Email is already in use.' };
+        }
+
+        if (!captainData.password || captainData.password.length < 5) {
+            return { success: false, message: 'Password must be at least 5 characters long.' };
+        }
+
+        const newCaptain: User = {
+            id: `user-${Date.now()}`,
+            name: captainData.name,
+            email: captainData.email,
+            password: captainData.password,
+            role: UserRole.CAPTAIN,
+        };
+        userStore.setState(prevUsers => [...prevUsers, newCaptain]);
+        return { success: true, message: 'Captain added successfully.' };
+    },
+    deleteCaptain: (userId: string) => {
+        userStore.setState(prevUsers => prevUsers.filter(user => user.id !== userId));
+    },
+    addMenuItem: (itemData: Omit<MenuItem, 'id'>) => {
+        const newItem: MenuItem = {
+            id: `menu-${Date.now()}`,
+            ...itemData,
+        };
+        menuStore.setState(prevMenu => [...prevMenu, newItem]);
+    },
+    updateMenuItem: (updatedItem: MenuItem) => {
+        menuStore.setState(prevMenu =>
+            prevMenu.map(item => (item.id === updatedItem.id ? updatedItem : item))
+        );
+    },
+    deleteMenuItem: (itemId: string) => {
+        menuStore.setState(prevMenu => prevMenu.filter(item => item.id !== itemId));
+    },
 };
